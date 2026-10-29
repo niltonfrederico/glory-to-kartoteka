@@ -12,7 +12,8 @@ What it does, per vault:
   * copies snippets/g2-*.css                   ->  <vault>/.obsidian/snippets/
   * keeps a previous theme.css once, as theme.css.prev, when it differs from the new one
 
---all reads ~/.config/obsidian/obsidian.json and, by default, only upgrades vaults whose
+--all reads every Obsidian registry it finds (~/.config/obsidian, Flatpak, and under WSL
+the Windows one in AppData/Roaming) and, by default, only upgrades vaults whose
 appearance.json already selects Nirvytekh: it replaces the June theme, it does not push
 the theme into a vault that chose another one. --include-others lifts that filter.
 
@@ -27,21 +28,44 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT
 THEME_NAME = "Nirvytekh"
-REGISTRY = Path.home() / ".config" / "obsidian" / "obsidian.json"
+WINDOWS_PATH = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def registries() -> list[Path]:
+    """Every obsidian.json on this machine: native, Flatpak, and under WSL the Windows one."""
+    candidates = [
+        Path.home() / ".config" / "obsidian" / "obsidian.json",
+        Path.home() / ".var" / "app" / "md.obsidian.Obsidian" / "config" / "obsidian" / "obsidian.json",
+        *sorted(Path("/mnt/c/Users").glob("*/AppData/Roaming/obsidian/obsidian.json")),
+    ]
+    return [p for p in candidates if p.exists()]
+
+
+def to_local(path: str) -> Path:
+    # The Windows registry stores C:\... paths; WSL reaches them through wslpath.
+    if WINDOWS_PATH.match(path):
+        return Path(subprocess.run(["wslpath", "-u", path], capture_output=True, text=True, check=True).stdout.strip())
+    return Path(path)
 
 
 def registry_vaults() -> list[Path]:
-    if not REGISTRY.exists():
-        sys.exit(f"no Obsidian registry at {REGISTRY}; pass --vault instead")
-    data = json.loads(REGISTRY.read_text())
-    return [Path(v["path"]) for v in data.get("vaults", {}).values() if "path" in v]
+    found = registries()
+    if not found:
+        sys.exit("no Obsidian registry found (native, Flatpak or Windows under WSL); pass --vault instead")
+    vaults: list[Path] = []
+    for registry in found:
+        data = json.loads(registry.read_text())
+        vaults += [to_local(v["path"]) for v in data.get("vaults", {}).values() if "path" in v]
+    return list(dict.fromkeys(vaults))
 
 
 def plan(vault: Path, snippets: bool) -> list[tuple[Path, Path]]:
