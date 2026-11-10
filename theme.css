@@ -654,7 +654,9 @@ button.mod-warning:hover { background: var(--g2-signal-bg); color: var(--g2-sign
 .clickable-icon { border-radius: 0; }
 .clickable-icon:hover { background: var(--g2-selection); }
 input[type="text"], input[type="search"], input[type="email"], input[type="password"], input[type="number"], textarea, .dropdown {
-  border: 1px solid var(--g2-border-faint); background: var(--g2-well); color: var(--g2-fg);
+  /* background-color, not the shorthand: the shorthand resets the chevron's
+     background-repeat/position/size on .dropdown and tiles the icon */
+  border: 1px solid var(--g2-border-faint); background-color: var(--g2-well); color: var(--g2-fg);
 }
 input:focus, textarea:focus, .dropdown:focus { border-color: var(--g2-accent); box-shadow: none; outline: 0; }
 .checkbox-container { border-radius: 0; background: var(--g2-panel-alt); border: 1px solid var(--g2-border); }
